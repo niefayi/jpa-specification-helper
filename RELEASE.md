@@ -17,13 +17,14 @@ Set them under Settings → Secrets and variables → Actions.
 
 ## Steps to release
 
-1. Bump the version in the three `pom.xml` files (parent + both modules).
+1. Bump `<revision>` in the parent `pom.xml` (single source of truth — both
+   modules inherit it via `${revision}`).
 2. Commit and push to `main`.
 3. Tag and push:
 
    ```bash
-   git tag v1.0.1
-   git push origin v1.0.1
+   git tag v1.1.0
+   git push origin v1.1.0
    ```
 
 4. Watch the run under Actions → "Publish to Maven Central". Once green, the

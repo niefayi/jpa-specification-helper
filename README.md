@@ -78,7 +78,7 @@ Pick the variant that matches your JPA / Spring Boot version:
 <dependency>
     <groupId>io.github.anyifei12138</groupId>
     <artifactId>jpa-specification-helper</artifactId>
-    <version>1.0.0</version>
+    <version>1.1.0</version>
 </dependency>
 ```
 
@@ -88,7 +88,7 @@ Pick the variant that matches your JPA / Spring Boot version:
 <dependency>
     <groupId>io.github.anyifei12138</groupId>
     <artifactId>jpa-specification-helper-jakarta</artifactId>
-    <version>1.0.0</version>
+    <version>1.1.0</version>
 </dependency>
 ```
 
@@ -147,8 +147,15 @@ Specified via `type()`, see `SelectTypeEnum`:
 
 - `value()`: when empty it targets the current field directly; when a dotted path
   (e.g. `"dept.name"`) it auto-joins the association, with `joinType()` selecting
-  `LEFT`/`INNER`/`RIGHT` (default `LEFT`, can also be set per segment).
+  `LEFT`/`INNER`/`RIGHT` (default `LEFT`, can also be set per segment). When an
+  explicit `joinType[]` is given it must match the number of join segments in the
+  path; otherwise it falls back to the first type.
 - `resolver()`: custom operator strategy, takes precedence over `type()`, see below.
+
+> **Note on `distinct`**: the built-in pipeline unconditionally enables
+> `distinct(true)` to keep join results free of duplicates. This is a deliberate
+> trade-off; if your query needs to keep duplicate rows, assemble a custom
+> `SpecificationPipeline` without the `SetDistinctStage`.
 
 ## Extensibility
 

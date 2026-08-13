@@ -74,7 +74,7 @@ Specification<User> spec = SpecificationHelper.DEFAULT.buildSpecification(condit
 <dependency>
     <groupId>io.github.anyifei12138</groupId>
     <artifactId>jpa-specification-helper</artifactId>
-    <version>1.0.0</version>
+    <version>1.1.0</version>
 </dependency>
 ```
 
@@ -84,7 +84,7 @@ Specification<User> spec = SpecificationHelper.DEFAULT.buildSpecification(condit
 <dependency>
     <groupId>io.github.anyifei12138</groupId>
     <artifactId>jpa-specification-helper-jakarta</artifactId>
-    <version>1.0.0</version>
+    <version>1.1.0</version>
 </dependency>
 ```
 
