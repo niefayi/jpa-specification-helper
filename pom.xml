@@ -5,12 +5,12 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>io.github.anyifei12138</groupId>
-    <artifactId>jpa-specification-helper</artifactId>
+    <artifactId>jpa-specification-helper-parent</artifactId>
     <version>1.0.0</version>
-    <packaging>jar</packaging>
+    <packaging>pom</packaging>
 
     <name>jpa-specification-helper</name>
-    <description>Annotation-driven JPA Specification builder for dynamic, type-safe query conditions.</description>
+    <description>Annotation-driven JPA Specification helper. Write a query once, reuse it everywhere.</description>
     <url>https://github.com/anyifei12138/jpa-specification-helper</url>
 
     <licenses>
@@ -43,63 +43,21 @@
         </repository>
     </distributionManagement>
 
+    <modules>
+        <module>jpa-specification-helper</module>
+        <module>jpa-specification-helper-jakarta</module>
+    </modules>
+
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <java.version>1.8</java.version>
 
-        <spring-data-jpa.version>2.3.5.RELEASE</spring-data-jpa.version>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+
+        <junit.version>5.9.2</junit.version>
+        <jackson.version>2.15.3</jackson.version>
     </properties>
-
-    <dependencies>
-        <!-- JPA Specification -->
-        <dependency>
-            <groupId>org.springframework.data</groupId>
-            <artifactId>spring-data-jpa</artifactId>
-            <version>${spring-data-jpa.version}</version>
-            <scope>provided</scope>
-        </dependency>
-
-        <!-- JPA Criteria API -->
-        <dependency>
-            <groupId>javax.persistence</groupId>
-            <artifactId>javax.persistence-api</artifactId>
-            <version>2.2</version>
-            <scope>provided</scope>
-        </dependency>
-
-        <!-- Test: JUnit 5 -->
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <version>5.9.2</version>
-            <scope>test</scope>
-        </dependency>
-
-        <!-- Test: JPA provider -->
-        <dependency>
-            <groupId>org.hibernate</groupId>
-            <artifactId>hibernate-core</artifactId>
-            <version>5.6.15.Final</version>
-            <scope>test</scope>
-        </dependency>
-
-        <!-- Test: in-memory database -->
-        <dependency>
-            <groupId>com.h2database</groupId>
-            <artifactId>h2</artifactId>
-            <version>1.4.200</version>
-            <scope>test</scope>
-        </dependency>
-
-        <!-- Test: JSON deserialization (frontend JSON -> condition objects) -->
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-            <version>2.15.3</version>
-            <scope>test</scope>
-        </dependency>
-    </dependencies>
 
     <build>
         <plugins>
@@ -108,8 +66,8 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.8.1</version>
                 <configuration>
-                    <source>${java.version}</source>
-                    <target>${java.version}</target>
+                    <source>${maven.compiler.source}</source>
+                    <target>${maven.compiler.target}</target>
                     <encoding>${project.build.sourceEncoding}</encoding>
                 </configuration>
             </plugin>

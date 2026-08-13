@@ -58,12 +58,17 @@ Specification<User> spec = SpecificationHelper.DEFAULT.buildSpecification(condit
 - 字段非空才参与条件拼接，空集合自动忽略
 - `@ConditionGroup` 嵌套类表达多条件 `AND` / `OR` 分组，任意嵌套
 - `@Select(value = "a.b.c")` 点号路径自动关联查询，join 结果缓存
+- 双版本：JPA 2（`javax.persistence`）与 JPA 3（`jakarta.persistence`），共享一份源码
 - 零运行时第三方依赖（仅 JPA，`provided`）
 - 字段缓存，性能友好
 
 ## 快速开始
 
 ### 引入依赖
+
+按你的 JPA / Spring Boot 版本选对应变体：
+
+- **JPA 2 / Spring Boot 2**（`javax.persistence`）：
 
 ```xml
 <dependency>
@@ -72,6 +77,18 @@ Specification<User> spec = SpecificationHelper.DEFAULT.buildSpecification(condit
     <version>1.0.0</version>
 </dependency>
 ```
+
+- **JPA 3 / Spring Boot 3**（`jakarta.persistence`）：
+
+```xml
+<dependency>
+    <groupId>io.github.anyifei12138</groupId>
+    <artifactId>jpa-specification-helper-jakarta</artifactId>
+    <version>1.0.0</version>
+</dependency>
+```
+
+两个变体 API 与源码完全一致，仅 JPA API 包不同。
 
 ### 定义查询条件
 
@@ -232,6 +249,9 @@ public static class Outer {
 即 `name = ? OR (age >= ? AND status != ?)`。
 
 ## 构建
+
+一次构建两个变体（JPA 2 的 `jpa-specification-helper` 与 JPA 3 的 `jpa-specification-helper-jakarta`）。
+需要 JDK 17+（jakarta 变体的测试跑在 Hibernate 6 上）。
 
 ```bash
 mvn clean install

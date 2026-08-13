@@ -62,12 +62,17 @@ The condition object *is* the reusable artifact:
 - Non-null fields participate; empty collections are ignored automatically
 - `@ConditionGroup` nested classes express multi-condition `AND` / `OR` grouping, arbitrarily nested
 - `@Select(value = "a.b.c")` dotted paths auto-join associations, with join caching
+- Dual variants: JPA 2 (`javax.persistence`) and JPA 3 (`jakarta.persistence`), sharing one source
 - Zero runtime dependencies (JPA only, `provided`)
 - Field caching, performance friendly
 
 ## Quick Start
 
 ### Dependency
+
+Pick the variant that matches your JPA / Spring Boot version:
+
+- **JPA 2 / Spring Boot 2** (`javax.persistence`):
 
 ```xml
 <dependency>
@@ -76,6 +81,18 @@ The condition object *is* the reusable artifact:
     <version>1.0.0</version>
 </dependency>
 ```
+
+- **JPA 3 / Spring Boot 3** (`jakarta.persistence`):
+
+```xml
+<dependency>
+    <groupId>io.github.anyifei12138</groupId>
+    <artifactId>jpa-specification-helper-jakarta</artifactId>
+    <version>1.0.0</version>
+</dependency>
+```
+
+Both variants share the same API and sources; only the JPA API package differs.
 
 ### Define a condition
 
@@ -244,6 +261,10 @@ public static class Outer {
 i.e. `name = ? OR (age >= ? AND status != ?)`.
 
 ## Build
+
+Builds both variants (`jpa-specification-helper` for JPA 2 and
+`jpa-specification-helper-jakarta` for JPA 3). Requires JDK 17+ because the
+jakarta variant's tests run on Hibernate 6.
 
 ```bash
 mvn clean install
