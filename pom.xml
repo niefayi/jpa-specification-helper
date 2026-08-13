@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>io.github.morphling</groupId>
+    <groupId>io.github.anyifei12138</groupId>
     <artifactId>jpa-specification-helper</artifactId>
     <version>1.0.0</version>
     <packaging>jar</packaging>
@@ -34,6 +34,14 @@
         <developerConnection>scm:git:ssh://git@github.com/anyifei12138/jpa-specification-helper.git</developerConnection>
         <url>https://github.com/anyifei12138/jpa-specification-helper</url>
     </scm>
+
+    <distributionManagement>
+        <repository>
+            <id>central</id>
+            <name>Central Portal Releases</name>
+            <url>https://central.sonatype.com/repository/maven-releases/</url>
+        </repository>
+    </distributionManagement>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -84,7 +92,7 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Test: JSON deserialization (前端 JSON → 条件对象) -->
+        <!-- Test: JSON deserialization (frontend JSON -> condition objects) -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
@@ -138,4 +146,30 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- Publish to Maven Central: mvn clean deploy -Prelease.
+             GPG signing only runs under this profile so normal builds do not require a key. -->
+        <profile>
+            <id>release</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>3.2.7</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

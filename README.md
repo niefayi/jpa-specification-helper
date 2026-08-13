@@ -1,5 +1,7 @@
 # jpa-specification-helper
 
+**English** · [中文](README.zh-CN.md)
+
 Annotation-driven dynamic JPA Specification builder.
 
 Write a query once, reuse it everywhere. Define conditions declaratively on a plain
@@ -69,7 +71,7 @@ The condition object *is* the reusable artifact:
 
 ```xml
 <dependency>
-    <groupId>io.github.morphling</groupId>
+    <groupId>io.github.anyifei12138</groupId>
     <artifactId>jpa-specification-helper</artifactId>
     <version>1.0.0</version>
 </dependency>

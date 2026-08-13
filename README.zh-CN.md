@@ -1,5 +1,7 @@
 # jpa-specification-helper
 
+[English](README.md) · **中文**
+
 注解驱动的动态 JPA Specification 构建器。
 
 查询只写一次，到处复用。把查询条件声明式地定义在一个普通 POJO 上，由本库自动生成类型安全的
@@ -65,7 +67,7 @@ Specification<User> spec = SpecificationHelper.DEFAULT.buildSpecification(condit
 
 ```xml
 <dependency>
-    <groupId>io.github.morphling</groupId>
+    <groupId>io.github.anyifei12138</groupId>
     <artifactId>jpa-specification-helper</artifactId>
     <version>1.0.0</version>
 </dependency>
