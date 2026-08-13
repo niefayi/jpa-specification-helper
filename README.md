@@ -51,8 +51,8 @@ The condition object *is* the reusable artifact:
   sends deserializes straight into them.
 - **Compose & nest** — `@ConditionGroup` builds AND / OR trees out of conditions
   without writing a single predicate.
-- **Extend** — plug in custom operators through `@Select.resolver()` instead of
-  forking the library.
+- **Extend** — plug in custom predicate operators via `@Select.resolver()` or add
+  build steps through a custom `SpecificationPipeline`; no forking required.
 
 ## Features
 
@@ -131,7 +131,11 @@ Specified via `type()`, see `SelectTypeEnum`:
   `LEFT`/`INNER`/`RIGHT` (default `LEFT`, can also be set per segment).
 - `resolver()`: custom operator strategy, takes precedence over `type()`, see below.
 
-## Custom operators (extension)
+## Extensibility
+
+The library is built around two extension points, so you can grow it without forking.
+
+### 1. Custom predicate operators
 
 `SelectTypeEnum` only ships common SQL operators. Business-specific operators (such
 as date-range filtering by day / month) are injected by implementing
@@ -142,9 +146,7 @@ as date-range filtering by day / month) are injected by implementing
 private Date birthdayDay;
 ```
 
-The built-in `AroundDayResolver` / `AroundMonthResolver`
-(`io.github.morphling.jpa.extension`) are implemented exactly this way. A custom
-strategy is just a class with a no-arg constructor implementing the interface:
+A custom strategy is just a class with a no-arg constructor:
 
 ```java
 public class MyResolver implements SelectPredicateResolver {
@@ -156,6 +158,41 @@ public class MyResolver implements SelectPredicateResolver {
 ```
 
 Strategies are stateless singletons, cached by class and thread-safe.
+
+### 2. Custom pipeline stages
+
+The whole build process is a pipeline of stages sharing a `SpecificationContext`.
+Implement `SpecificationStage` and assemble your own `SpecificationPipeline`, then
+inject it into `SpecificationHelper`:
+
+```java
+SpecificationPipeline pipeline = new SpecificationPipeline(Arrays.asList(
+        new SetDistinctStage(),
+        new MyStage(),      // your custom stage
+        new ConditionProcessor()
+));
+SpecificationHelper helper = new SpecificationHelper(pipeline);
+```
+
+```java
+public class MyStage implements SpecificationStage {
+    @Override
+    public void process(SpecificationContext context) {
+        // read / mutate the shared context, e.g. context.getQuery(), context.getResult()
+    }
+}
+```
+
+For most use cases the built-in pipeline is enough — just use the shared singleton
+`SpecificationHelper.DEFAULT`.
+
+### Extension points at a glance
+
+| Extension point | Interface / entry | What it extends |
+| --------------- | ----------------- | --------------- |
+| Predicate operator | `SelectPredicateResolver` + `@Select.resolver()` | new query operators |
+| Pipeline stage | `SpecificationStage` + `SpecificationPipeline` | new build steps (distinct, transformation, ...) |
+| Entry point | `SpecificationHelper` (or `SpecificationHelper.DEFAULT`) | how a query is built |
 
 ## Grouping example
 

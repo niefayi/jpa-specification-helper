@@ -47,7 +47,8 @@ Specification<User> spec = SpecificationHelper.DEFAULT.buildSpecification(condit
 - **一处定义，多处使用** —— 同一个条件同时驱动列表 / 计数 / 导出，零重复逻辑
 - **前端 → 后端** —— 条件是普通 POJO，前端传回来的 JSON 直接反序列化进条件对象
 - **组合与嵌套** —— `@ConditionGroup` 用条件对象拼出 AND / OR 布尔树，不用写一行谓词
-- **可扩展** —— 通过 `@Select.resolver()` 注入自定义操作符，不用改库本身
+- **可扩展** —— 通过 `@Select.resolver()` 注入自定义操作符，或通过自定义 `SpecificationPipeline`
+  增加构建步骤，都不用改库本身
 
 ## 特性
 
@@ -123,7 +124,11 @@ Specification<User> spec = SpecificationHelper.DEFAULT.buildSpecification(condit
   可通过 `joinType()` 指定 `LEFT`/`INNER`/`RIGHT`（默认为 `LEFT`，也可逐段指定）。
 - `resolver()`：自定义操作符策略，设置后优先于 `type()`，见下节。
 
-## 自定义操作符（扩展）
+## 扩展性
+
+本库围绕两个扩展点设计，无需 fork 即可按需生长。
+
+### 1. 自定义操作符
 
 `SelectTypeEnum` 只内置通用 SQL 操作符。业务相关的操作符（如按天 / 月过滤的日期区间）
 通过实现 `SelectPredicateResolver` 注入，用 `@Select.resolver()` 引用：
@@ -133,8 +138,7 @@ Specification<User> spec = SpecificationHelper.DEFAULT.buildSpecification(condit
 private Date birthdayDay;
 ```
 
-内置的 `AroundDayResolver` / `AroundMonthResolver`（`io.github.morphling.jpa.extension` 包）
-即按此机制实现。自定义策略只需实现接口的无参构造类：
+自定义策略只需实现接口的无参构造类：
 
 ```java
 public class MyResolver implements SelectPredicateResolver {
@@ -146,6 +150,39 @@ public class MyResolver implements SelectPredicateResolver {
 ```
 
 策略为无状态单例，按类缓存、线程安全。
+
+### 2. 自定义流水线阶段
+
+整个构建过程是一条共享 `SpecificationContext` 的流水线。实现 `SpecificationStage`
+并组装自己的 `SpecificationPipeline`，再注入 `SpecificationHelper`：
+
+```java
+SpecificationPipeline pipeline = new SpecificationPipeline(Arrays.asList(
+        new SetDistinctStage(),
+        new MyStage(),      // 你的自定义阶段
+        new ConditionProcessor()
+));
+SpecificationHelper helper = new SpecificationHelper(pipeline);
+```
+
+```java
+public class MyStage implements SpecificationStage {
+    @Override
+    public void process(SpecificationContext context) {
+        // 读取 / 修改共享上下文，如 context.getQuery()、context.getResult()
+    }
+}
+```
+
+大多数场景内置流水线就够用——直接用共享单例 `SpecificationHelper.DEFAULT`。
+
+### 扩展点一览
+
+| 扩展点 | 接口 / 入口 | 扩展什么 |
+| ------ | ----------- | -------- |
+| 谓词操作符 | `SelectPredicateResolver` + `@Select.resolver()` | 新的查询操作符 |
+| 流水线阶段 | `SpecificationStage` + `SpecificationPipeline` | 新的构建步骤（去重、转换……） |
+| 入口 | `SpecificationHelper`（或 `SpecificationHelper.DEFAULT`） | 查询如何被构建 |
 
 ## 分组示例
 
