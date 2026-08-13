@@ -5,13 +5,13 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>io.github.morphling</groupId>
-    <artifactId>morphling-jpa-specification-builder</artifactId>
+    <artifactId>jpa-specification-helper</artifactId>
     <version>1.0.0</version>
     <packaging>jar</packaging>
 
-    <name>morphling-jpa-specification-builder</name>
+    <name>jpa-specification-helper</name>
     <description>Annotation-driven JPA Specification builder for dynamic, type-safe query conditions.</description>
-    <url>https://github.com/morphling/morphling-jpa-specification-builder</url>
+    <url>https://github.com/anyifei12138/jpa-specification-helper</url>
 
     <licenses>
         <license>
@@ -23,16 +23,16 @@
 
     <developers>
         <developer>
-            <name>morphling</name>
-            <email>morphling@github.com</email>
-            <url>https://github.com/morphling</url>
+            <name>anyifei</name>
+            <email>anyifei12138@users.noreply.github.com</email>
+            <url>https://github.com/anyifei12138</url>
         </developer>
     </developers>
 
     <scm>
-        <connection>scm:git:git://github.com/morphling/morphling-jpa-specification-builder.git</connection>
-        <developerConnection>scm:git:ssh://git@github.com/morphling/morphling-jpa-specification-builder.git</developerConnection>
-        <url>https://github.com/morphling/morphling-jpa-specification-builder</url>
+        <connection>scm:git:git://github.com/anyifei12138/jpa-specification-helper.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/anyifei12138/jpa-specification-helper.git</developerConnection>
+        <url>https://github.com/anyifei12138/jpa-specification-helper</url>
     </scm>
 
     <properties>

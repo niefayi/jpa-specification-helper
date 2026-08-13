@@ -1,4 +1,4 @@
-# morphling-jpa-specification-builder
+# jpa-specification-helper
 
 注解驱动的动态 JPA Specification 构建器。
 
@@ -66,7 +66,7 @@ Specification<User> spec = SpecificationHelper.DEFAULT.buildSpecification(condit
 ```xml
 <dependency>
     <groupId>io.github.morphling</groupId>
-    <artifactId>morphling-jpa-specification-builder</artifactId>
+    <artifactId>jpa-specification-helper</artifactId>
     <version>1.0.0</version>
 </dependency>
 ```

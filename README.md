@@ -1,4 +1,4 @@
-# morphling-jpa-specification-builder
+# jpa-specification-helper
 
 Annotation-driven dynamic JPA Specification builder.
 
@@ -70,7 +70,7 @@ The condition object *is* the reusable artifact:
 ```xml
 <dependency>
     <groupId>io.github.morphling</groupId>
-    <artifactId>morphling-jpa-specification-builder</artifactId>
+    <artifactId>jpa-specification-helper</artifactId>
     <version>1.0.0</version>
 </dependency>
 ```
