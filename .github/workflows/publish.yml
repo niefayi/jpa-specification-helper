@@ -24,6 +24,15 @@ jobs:
           echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
           gpg --list-secret-keys
 
+      - name: Verify GPG passphrase
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          echo "GPG_PASSPHRASE length: ${#GPG_PASSPHRASE}"
+          printf 'verify' > /tmp/verify.txt
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" \
+            --local-user 462A7AE42FECA444 --detach-sign /tmp/verify.txt && echo "PASSPHRASE OK"
+
       - name: Write Maven settings (central credentials + gpg)
         run: |
           mkdir -p ~/.m2
