@@ -42,7 +42,7 @@
 
     <properties>
         <!-- single source of truth for the version; release = bump here + tag -->
-        <revision>1.1.0</revision>
+        <revision>1.2.0</revision>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
@@ -63,7 +63,25 @@
                     <source>${maven.compiler.source}</source>
                     <target>${maven.compiler.target}</target>
                     <encoding>${project.build.sourceEncoding}</encoding>
+                    <!-- The bundled EntityConditionProcessor must not run while this
+                         library's own main sources compile (its processor class would not
+                         be compiled yet on a clean build). Consumers get the processor
+                         auto-discovered via META-INF/services at compile time. -->
+                    <proc>none</proc>
                 </configuration>
+                <!-- For the library's own tests the processor IS available (already
+                     compiled into target/classes), so testCompile runs annotation
+                     processing: it generates <Entity>Fields for the test entities and
+                     validates the typed test conditions. This lets the IDE auto-complete
+                     UserFields.* inside the test module. -->
+                <executions>
+                    <execution>
+                        <id>default-testCompile</id>
+                        <configuration>
+                            <proc>full</proc>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

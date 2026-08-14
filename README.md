@@ -56,12 +56,40 @@ The condition object *is* the reusable artifact:
 - **Extend** — plug in custom predicate operators via `@Select.resolver()` or add
   build steps through a custom `SpecificationPipeline`; no forking required.
 
+### 3. Specifications are type-unsafe
+
+`root.get("name")` is just a magic string — the compiler cannot tell whether
+`"name"` exists on `User`, whether it matches the entity attribute's type, or
+whether the value you compare it with is compatible. A typo like `"nem"` only
+fails at query time (or silently matches nothing); a `LIKE` on a `Date` field
+blows up at runtime too.
+
+With `@EntityCondition(entity = User.class)` the same paths are validated against
+the entity at **compile time**, and the generated `UserFields` constants make them
+refactor-safe and IDE auto-completable:
+
+```java
+@EntityCondition(entity = User.class)
+public class UserCondition {
+    @Select(value = UserFields.name, type = SelectTypeEnum.LIKE)
+    private String name;
+
+    @Select(value = UserFields.dept.name, type = SelectTypeEnum.LIKE)
+    private String deptName;
+}
+```
+
 ## Features
 
 - One `@Select` annotation describes the query semantics; `SelectTypeEnum` covers all common operations
 - Non-null fields participate; empty collections are ignored automatically
 - `@ConditionGroup` nested classes express multi-condition `AND` / `OR` grouping, arbitrarily nested
 - `@Select(value = "a.b.c")` dotted paths auto-join associations, with join caching
+- **Type-safe**: bind a condition to its entity with `@EntityCondition(entity = ...)` — a bundled compile-time processor
+  validates every `@Select` path and value type against the entity (unknown fields / wrong types fail the build),
+  and generates `<Entity>Fields` constants for IDE auto-completion (`@Select(value = UserFields.dept.name)`)
+- **Zero runtime overhead**: the processor is compile-time only; at runtime the behaviour is byte-for-byte identical to
+  the plain string-path version
 - Dual variants: JPA 2 (`javax.persistence`) and JPA 3 (`jakarta.persistence`), sharing one source
 - Zero runtime dependencies (JPA only, `provided`)
 - Field caching, performance friendly
@@ -78,7 +106,7 @@ Pick the variant that matches your JPA / Spring Boot version:
 <dependency>
     <groupId>io.github.anyifei12138</groupId>
     <artifactId>jpa-specification-helper</artifactId>
-    <version>1.1.0</version>
+    <version>1.2.0</version>
 </dependency>
 ```
 
@@ -88,7 +116,7 @@ Pick the variant that matches your JPA / Spring Boot version:
 <dependency>
     <groupId>io.github.anyifei12138</groupId>
     <artifactId>jpa-specification-helper-jakarta</artifactId>
-    <version>1.1.0</version>
+    <version>1.2.0</version>
 </dependency>
 ```
 
@@ -130,6 +158,94 @@ directly and then built into a query:
 UserCondition condition = objectMapper.readValue(json, UserCondition.class);
 Specification<User> spec = SpecificationHelper.DEFAULT.buildSpecification(condition);
 ```
+
+## Type-safe conditions (entity binding)
+
+Bind a condition to its JPA entity with `@EntityCondition(entity = ...)` on the root
+condition class. A compile-time annotation processor (bundled in the same jar and
+auto-discovered by `javac`) then:
+
+> **What it runs on.** The processor is an AST-based javac annotation processor: it reads
+> your condition / entity classes from the compiler's AST through the standard
+> `javax.lang.model` API (`Elements` / `Types`), and writes the generated `*Fields`
+> interfaces back into the compilation via `Filer`. It validates and generates new source
+> files — it never rewrites your own classes.
+
+- **validates every `@Select`** against the entity — the path must exist (traversed
+  through joinable associations only; `@Embedded` segments are rejected because the
+  runtime joins every path segment), and the condition field's type must be
+  compatible with the entity attribute for the given operator. Any mismatch fails
+  the build with a precise message:
+
+  ```
+  @Select path "dept.nam" — field "nam" not found on entity User, did you mean "name"?
+  @Select LIKE on path "age" requires a String attribute, but the entity attribute is java.lang.Integer
+  ```
+- **generates `<Entity>Fields` constants** (one interface per `@Entity`, in the entity's
+  package) whose members mirror the persistent attributes and association paths, so the
+  IDE auto-completes and refactor-safe paths are typed:
+
+```java
+@EntityCondition(entity = User.class)
+public class UserCondition {
+    @Select(value = UserFields.name, type = SelectTypeEnum.LIKE)
+    private String name;
+
+    @Select(value = UserFields.dept.name, type = SelectTypeEnum.LIKE)
+    private String deptName;
+
+    @Select(value = UserFields.roles.code, type = SelectTypeEnum.IN)
+    private List<String> roleCodes;
+}
+```
+
+The generated constants look like:
+
+```java
+public interface UserFields {
+    String id = "id";
+    String name = "name";
+    String age = "age";
+    interface dept {
+        String id = "dept.id";
+        String name = "dept.name";
+        // ...
+    }
+    interface roles {
+        String code = "roles.code";
+        // ...
+    }
+}
+```
+
+Deep association paths auto-complete one segment at a time — bind the condition to the
+entity that **owns** the path (here `users` belongs to `Dept`, not `User`):
+
+```java
+@EntityCondition(entity = Dept.class)
+public class DeptUserNicknameCondition {
+    // type DeptFields. -> users -> profile -> nickname
+    @Select(value = DeptFields.users.profile.nickname, type = SelectTypeEnum.EQ)
+    private String nickname;
+}
+```
+
+Notes:
+
+- Nested `@ConditionGroup` classes are validated against the same entity root, so the
+  annotation is only needed on the root class.
+- Conditions without `@EntityCondition` are left untouched — fully backward compatible.
+- **IDE auto-completion**: enable *Annotation Processing* for the project (IntelliJ IDEA
+  enables it by default, and it stays on when building via Maven — the library's own
+  `<proc>none</proc>` does not leak into consumer builds). After the first build the
+  generated `*Fields` interfaces appear under `target/generated-sources/annotations`; if
+  the IDE does not pick them up, right-click that directory → *Mark Directory as →
+  Generated Sources Root* and rebuild. Then typing `DeptFields.` auto-completes
+  `users`, then `profile`, then `nickname`.
+- Constants are generated from the `@Entity` classes compiled in the module. If your
+  entities live in a separate (dependency) module, either add this artifact there too so
+  its `Fields` constants are generated, or keep using string paths — validation still runs
+  against entities from dependency jars.
 
 ## Query types supported by @Select
 
@@ -178,7 +294,7 @@ A custom strategy is just a class with a no-arg constructor:
 public class MyResolver implements SelectPredicateResolver {
     @Override
     public Predicate getPredicate(From<?, ?> from, CriteriaBuilder cb, String fieldName, Object fieldObject) {
-        // ...
+        // from.get(fieldName), cb.*, ...
     }
 }
 ```
@@ -208,6 +324,17 @@ public class MyStage implements SpecificationStage {
     }
 }
 ```
+
+**The core `ConditionProcessor` stage is protected.** It is what turns the condition
+object into predicates, so a custom pipeline can never silently skip it:
+
+- The constructor **auto-appends** a `ConditionProcessor` when the given list does not
+  contain one — your pipeline always processes conditions even if you forget it.
+- `SpecificationPipeline.requireConditionProcessor(stages)` is the strict variant: it
+  throws `IllegalArgumentException` when the stage is missing.
+
+`SetDistinctStage` is deliberately optional — leave it out to keep duplicate rows (see
+the note on `distinct` above).
 
 For most use cases the built-in pipeline is enough — just use the shared singleton
 `SpecificationHelper.DEFAULT`.

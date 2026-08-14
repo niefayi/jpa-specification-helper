@@ -52,12 +52,36 @@ Specification<User> spec = SpecificationHelper.DEFAULT.buildSpecification(condit
 - **可扩展** —— 通过 `@Select.resolver()` 注入自定义操作符，或通过自定义 `SpecificationPipeline`
   增加构建步骤，都不用改库本身
 
+### 3. Specification 类型不安全
+
+`root.get("name")` 只是魔法字符串 —— 编译器无法知道 `"name"` 在 `User` 上是否存在、类型是否匹配实体属性、
+比较的值是否兼容。拼错成 `"nem"` 只能等到查询时才报错（甚至静默查不到任何结果）；在 `Date` 字段上用 `LIKE`
+也是运行时才炸。
+
+用 `@EntityCondition(entity = User.class)` 之后，同样的路径会在**编译期**对照实体校验，生成的 `UserFields`
+常量让路径可重构、可被 IDE 自动补全：
+
+```java
+@EntityCondition(entity = User.class)
+public class UserCondition {
+    @Select(value = UserFields.name, type = SelectTypeEnum.LIKE)
+    private String name;
+
+    @Select(value = UserFields.dept.name, type = SelectTypeEnum.LIKE)
+    private String deptName;
+}
+```
+
 ## 特性
 
 - 一个 `@Select` 注解描述查询语义，`SelectTypeEnum` 覆盖全部常用操作
 - 字段非空才参与条件拼接，空集合自动忽略
 - `@ConditionGroup` 嵌套类表达多条件 `AND` / `OR` 分组，任意嵌套
 - `@Select(value = "a.b.c")` 点号路径自动关联查询，join 结果缓存
+- **类型安全** —— 用 `@EntityCondition(entity = ...)` 把条件绑定到实体：随 jar 一起发布的编译期处理器会对每个
+  `@Select` 做校验（路径不存在 / 值类型不匹配直接编译报错），并为实体生成 `<Entity>Fields` 常量用于 IDE 自动补全
+  （`@Select(value = UserFields.dept.name)`）
+- **零运行时开销** —— 处理器只在编译期生效，运行时行为与纯字符串路径版本完全一致
 - 双版本：JPA 2（`javax.persistence`）与 JPA 3（`jakarta.persistence`），共享一份源码
 - 零运行时第三方依赖（仅 JPA，`provided`）
 - 字段缓存，性能友好
@@ -74,7 +98,7 @@ Specification<User> spec = SpecificationHelper.DEFAULT.buildSpecification(condit
 <dependency>
     <groupId>io.github.anyifei12138</groupId>
     <artifactId>jpa-specification-helper</artifactId>
-    <version>1.1.0</version>
+    <version>1.2.0</version>
 </dependency>
 ```
 
@@ -84,7 +108,7 @@ Specification<User> spec = SpecificationHelper.DEFAULT.buildSpecification(condit
 <dependency>
     <groupId>io.github.anyifei12138</groupId>
     <artifactId>jpa-specification-helper-jakarta</artifactId>
-    <version>1.1.0</version>
+    <version>1.2.0</version>
 </dependency>
 ```
 
@@ -125,6 +149,76 @@ UserCondition condition = objectMapper.readValue(json, UserCondition.class);
 Specification<User> spec = SpecificationHelper.DEFAULT.buildSpecification(condition);
 ```
 
+## 类型安全的条件（实体绑定）
+
+在根条件类上用 `@EntityCondition(entity = ...)` 绑定 JPA 实体。随 jar 打包、由 `javac` 自动发现的编译期注解处理器会：
+
+> **它基于 AST 工作。** 这是一个基于 AST 的 javac 注解处理器：通过标准的 `javax.lang.model` API
+> （`Elements` / `Types`）读取你正在编译的条件类 / 实体类的 AST，再通过 `Filer` 把生成的 `*Fields`
+> 接口写回编译过程。它只做校验和生成新的源文件，绝不会改写你的类本身。
+
+- **校验每个 `@Select`** —— 路径必须在实体上存在（中间段只能是可 join 的关联；`@Embedded` 段会直接报错，因为运行时对所有中间段做 join），且条件字段类型必须与实体属性在当前
+  操作符下兼容；任何不匹配都会让编译失败，并给出精确信息：
+
+  ```
+  @Select path "dept.nam" — field "nam" not found on entity User, did you mean "name"?
+  @Select LIKE on path "age" requires a String attribute, but the entity attribute is java.lang.Integer
+  ```
+- **生成 `<Entity>Fields` 常量**（每个 `@Entity` 一个接口，放在实体所在包），成员镜像实体的持久化属性与关联路径，
+  让 IDE 自动补全、路径可重构：
+
+```java
+@EntityCondition(entity = User.class)
+public class UserCondition {
+    @Select(value = UserFields.name, type = SelectTypeEnum.LIKE)
+    private String name;
+
+    @Select(value = UserFields.dept.name, type = SelectTypeEnum.LIKE)
+    private String deptName;
+
+    @Select(value = UserFields.roles.code, type = SelectTypeEnum.IN)
+    private List<String> roleCodes;
+}
+```
+
+生成的常量大致如下：
+
+```java
+public interface UserFields {
+    String id = "id";
+    String name = "name";
+    String age = "age";
+    interface dept {
+        String id = "dept.id";
+        String name = "dept.name";
+        // ...
+    }
+    interface roles {
+        String code = "roles.code";
+        // ...
+    }
+}
+```
+
+深关联路径也是一段一段自动补全的 —— 条件要绑定到**拥有该路径起点**的实体（这里 `users` 属于 `Dept`，不属于 `User`）：
+
+```java
+@EntityCondition(entity = Dept.class)
+public class DeptUserNicknameCondition {
+    // 输入 DeptFields. -> users -> profile -> nickname 逐段自动补全
+    @Select(value = DeptFields.users.profile.nickname, type = SelectTypeEnum.EQ)
+    private String nickname;
+}
+```
+
+说明：
+
+- 嵌套的 `@ConditionGroup` 沿用同一实体根进行校验，注解只需标在根类上。
+- 没有 `@EntityCondition` 的条件完全不受影响 —— 向后兼容。
+- **IDE 自动补全**：请开启工程的 *Annotation Processing*（IntelliJ IDEA 默认开启；走 Maven 构建时也保持开启——本库自身的 `<proc>none</proc>` 不会泄漏到使用方）。首次构建后生成的 `*Fields` 接口出现在 `target/generated-sources/annotations` 下；如果 IDE 没识别，右键该目录 → *Mark Directory as → Generated Sources Root* 再重建。之后输入 `DeptFields.` 就会依次补全 `users`、`profile`、`nickname`。
+- 常量由本模块内编译的 `@Entity` 类生成。如果实体在独立的依赖模块里，可把本构件也加进去生成常量，或继续用字符串路径——
+  校验对依赖 jar 里的实体同样生效。
+
 ## @Select 支持的查询类型
 
 通过 `type()` 指定，见 `SelectTypeEnum`：
@@ -163,7 +257,7 @@ private Date birthdayDay;
 public class MyResolver implements SelectPredicateResolver {
     @Override
     public Predicate getPredicate(From<?, ?> from, CriteriaBuilder cb, String fieldName, Object fieldObject) {
-        // ...
+        // from.get(fieldName)、cb.* 等
     }
 }
 ```
@@ -192,6 +286,13 @@ public class MyStage implements SpecificationStage {
     }
 }
 ```
+
+**核心阶段 `ConditionProcessor` 是受保护的。** 它负责把条件对象转成谓词，自定义管线不能悄悄跳过它：
+
+- 构造函数在传入列表里没有 `ConditionProcessor` 时会**自动在末尾追加**一个——即使你忘了写，条件也一定会被处理。
+- 想要严格校验可用 `SpecificationPipeline.requireConditionProcessor(stages)`：缺少该阶段会抛 `IllegalArgumentException`。
+
+`SetDistinctStage` 是刻意可选的——去掉它即可保留重复行（见上文 `distinct` 的说明）。
 
 大多数场景内置流水线就够用——直接用共享单例 `SpecificationHelper.DEFAULT`。
 

@@ -33,6 +33,10 @@ import java.util.logging.Logger;
  * <p>Also resolves dotted paths (e.g. {@code "dept.name"}) into joins and caches
  * them by prefix path.</p>
  *
+ * <p>The runtime is intentionally identical to the plain string-path behaviour —
+ * all type safety is enforced at compile time by
+ * {@code io.github.morphling.jpa.processor.EntityConditionProcessor}.</p>
+ *
  * @author anyifei
  */
 public final class ConditionProcessor implements SpecificationStage {

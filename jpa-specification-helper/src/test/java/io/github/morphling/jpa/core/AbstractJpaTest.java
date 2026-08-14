@@ -1,7 +1,10 @@
 package io.github.morphling.jpa.core;
 
+import io.github.morphling.jpa.test.entity.Address;
+import io.github.morphling.jpa.test.entity.Customer;
 import io.github.morphling.jpa.test.entity.Dept;
 import io.github.morphling.jpa.test.entity.Profile;
+import io.github.morphling.jpa.test.entity.Region;
 import io.github.morphling.jpa.test.entity.Role;
 import io.github.morphling.jpa.test.entity.User;
 import org.hibernate.cfg.Configuration;
@@ -50,6 +53,9 @@ public abstract class AbstractJpaTest {
                 .addAnnotatedClass(Dept.class)
                 .addAnnotatedClass(Profile.class)
                 .addAnnotatedClass(Role.class)
+                .addAnnotatedClass(Customer.class)
+                .addAnnotatedClass(Address.class)
+                .addAnnotatedClass(Region.class)
                 .buildSessionFactory();
     }
 
