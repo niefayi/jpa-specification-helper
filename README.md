@@ -85,8 +85,12 @@ public class UserCondition {
 - Non-null fields participate; empty collections are ignored automatically
 - `@ConditionGroup` nested classes express multi-condition `AND` / `OR` grouping, arbitrarily nested
 - `@Select(value = "a.b.c")` dotted paths auto-join associations, with join caching
+- **Ordering** — `@OrderBy` on a condition field (dotted path + direction + priority), or a Spring
+  `Sort` via `Specifications.orderBy(Sort)`
+- **Spring-style composition** — `Specifications.where(c).and(c).or(spec).not().build()` chains condition
+  POJOs and hand-written `Specification`s, all null-safe
 - **Type-safe**: bind a condition to its entity with `@EntityCondition(entity = ...)` — a bundled compile-time processor
-  validates every `@Select` path and value type against the entity (unknown fields / wrong types fail the build),
+  validates every `@Select` and `@OrderBy` path and value type against the entity (unknown fields / wrong types fail the build),
   and generates `<Entity>Fields` constants for IDE auto-completion (`@Select(value = UserFields.dept.name)`)
 - **Zero runtime overhead**: the processor is compile-time only; at runtime the behaviour is byte-for-byte identical to
   the plain string-path version
@@ -158,6 +162,51 @@ directly and then built into a query:
 UserCondition condition = objectMapper.readValue(json, UserCondition.class);
 Specification<User> spec = SpecificationHelper.DEFAULT.buildSpecification(condition);
 ```
+
+### Compose & order (Spring-style)
+
+`Specifications` mirrors Spring Data's `Specification.where(...).and(...).or(...)`
+but accepts condition POJOs alongside hand-written specifications. Every call is
+immutable and null-safe (a `null` operand contributes nothing; an empty condition
+matches everything):
+
+```java
+Specification<User> spec = Specifications.<User>where(userCondition)
+        .and(anotherCondition)
+        .or((root, q, cb) -> cb.equal(root.get("status"), 1))
+        .not()
+        .orderBy(Sort.by(Sort.Direction.DESC, "age"))
+        .build();
+```
+
+The result is a plain `Specification`, usable directly with
+`JpaSpecificationExecutor`.
+
+Ordering can also be declared on the condition itself with `@OrderBy`. Enable it
+on the helper via the fluent builder:
+
+```java
+public class UserCondition {
+    @Select(type = SelectTypeEnum.LIKE)
+    private String name;
+
+    @OrderBy(value = UserFields.dept.name, direction = OrderDirection.ASC, priority = 0)
+    private Boolean sortByDept;   // any non-null value turns the ordering on
+
+    @OrderBy(value = "age", direction = OrderDirection.DESC, priority = 1)
+    private Boolean sortByAge;
+}
+
+SpecificationHelper helper = SpecificationHelper.builder()
+        .distinct(true)   // optional: prepend SetDistinctStage
+        .orderBy(true)    // optional: apply @OrderBy fields
+        .build();
+```
+
+`@OrderBy` fields participate only when non-null, apply dotted join paths, and
+multiple fields sort by `priority` (lower first, then declaration order). Both
+`@Select` and `@OrderBy` paths are validated at compile time when the condition
+is bound with `@EntityCondition`.
 
 ## Type-safe conditions (entity binding)
 
@@ -275,7 +324,7 @@ Specified via `type()`, see `SelectTypeEnum`:
 
 ## Extensibility
 
-The library is built around two extension points, so you can grow it without forking.
+The library is built around a few extension points, so you can grow it without forking.
 
 ### 1. Custom predicate operators
 
@@ -299,7 +348,16 @@ public class MyResolver implements SelectPredicateResolver {
 }
 ```
 
-Strategies are stateless singletons, cached by class and thread-safe.
+Strategies are stateless singletons, cached by class and thread-safe. If a resolver
+needs dependencies or shared state, register concrete instances on a
+`SelectPredicateResolverRegistry` and inject it into the helper:
+
+```java
+SelectPredicateResolverRegistry registry = new SelectPredicateResolverRegistry();
+registry.register(MyResolver.class, myResolverWithDependencies);
+
+SpecificationHelper helper = SpecificationHelper.builder().registry(registry).build();
+```
 
 ### 2. Custom pipeline stages
 
@@ -325,16 +383,51 @@ public class MyStage implements SpecificationStage {
 }
 ```
 
-**The core `ConditionProcessor` stage is protected.** It is what turns the condition
-object into predicates, so a custom pipeline can never silently skip it:
+**Condition processing is protected.** Turning the condition object into predicates
+can never be silently skipped:
 
-- The constructor **auto-appends** a `ConditionProcessor` when the given list does not
-  contain one — your pipeline always processes conditions even if you forget it.
+- The constructor **auto-appends** a `ConditionProcessor` when the given list contains
+  no `ConditionProcessorStage` — the marker interface that every processor implements,
+  so a custom processor is protected too.
 - `SpecificationPipeline.requireConditionProcessor(stages)` is the strict variant: it
-  throws `IllegalArgumentException` when the stage is missing.
+  throws `IllegalArgumentException` when no such stage is present.
 
 `SetDistinctStage` is deliberately optional — leave it out to keep duplicate rows (see
 the note on `distinct` above).
+
+### 3. Customise the traversal (template method)
+
+`ConditionProcessor` inherits its algorithm from `AbstractConditionProcessor`. To
+customise *how* conditions are turned into predicates — without losing the pipeline
+protection — extend the base class and override its protected hooks:
+
+```java
+public class NameOnlyProcessor extends AbstractConditionProcessor {
+    @Override
+    protected boolean shouldProcessField(Field field, Object value) {
+        return field.getName().equals("name");
+    }
+}
+```
+
+Available hooks: `shouldProcessField`, `isMeaningful`, `combinePredicates`,
+`resolveJoinTarget`, `resolveResolver`, `resolveFieldName`. The overall traversal
+(`process`) is final, so a subclass can tune every step but not break the pipeline
+contract.
+
+### 4. Fluent helper builder
+
+`SpecificationHelper.builder()` assembles a helper from declarative flags and custom
+stages — a convenient alternative to building a `SpecificationPipeline` by hand:
+
+```java
+SpecificationHelper helper = SpecificationHelper.builder()
+        .distinct(true)                    // prepend SetDistinctStage
+        .orderBy(true)                     // append OrderByStage (@OrderBy support)
+        .stage(new MyStage())              // custom stages run after condition processing
+        .registry(customRegistry)          // resolver registry
+        .build();
+```
 
 For most use cases the built-in pipeline is enough — just use the shared singleton
 `SpecificationHelper.DEFAULT`.
@@ -344,7 +437,11 @@ For most use cases the built-in pipeline is enough — just use the shared singl
 | Extension point | Interface / entry | What it extends |
 | --------------- | ----------------- | --------------- |
 | Predicate operator | `SelectPredicateResolver` + `@Select.resolver()` | new query operators |
+| Resolver instances | `SelectPredicateResolverRegistry` | resolver dependency / shared state |
 | Pipeline stage | `SpecificationStage` + `SpecificationPipeline` | new build steps (distinct, transformation, ...) |
+| Condition traversal | `AbstractConditionProcessor` (template method) | how the condition object becomes predicates |
+| Helper assembly | `SpecificationHelper.builder()` | declarative pipeline configuration |
+| Query composition | `Specifications` | chaining conditions / specifications, sorting |
 | Entry point | `SpecificationHelper` (or `SpecificationHelper.DEFAULT`) | how a query is built |
 
 ## Grouping example
