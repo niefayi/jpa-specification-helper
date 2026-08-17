@@ -78,8 +78,10 @@ public class UserCondition {
 - 字段非空才参与条件拼接，空集合自动忽略
 - `@ConditionGroup` 嵌套类表达多条件 `AND` / `OR` 分组，任意嵌套
 - `@Select(value = "a.b.c")` 点号路径自动关联查询，join 结果缓存
+- **排序** —— 条件字段上加 `@OrderBy`（点号路径 + 方向 + 优先级），或通过 `Specifications.orderBy(Sort)` 直接传 Spring `Sort`
+- **Spring 风格组合** —— `Specifications.where(c).and(c).or(spec).not().build()` 链式混搭条件对象与手写 `Specification`，全程空安全
 - **类型安全** —— 用 `@EntityCondition(entity = ...)` 把条件绑定到实体：随 jar 一起发布的编译期处理器会对每个
-  `@Select` 做校验（路径不存在 / 值类型不匹配直接编译报错），并为实体生成 `<Entity>Fields` 常量用于 IDE 自动补全
+  `@Select` 和 `@OrderBy` 做校验（路径不存在 / 值类型不匹配直接编译报错），并为实体生成 `<Entity>Fields` 常量用于 IDE 自动补全
   （`@Select(value = UserFields.dept.name)`）
 - **零运行时开销** —— 处理器只在编译期生效，运行时行为与纯字符串路径版本完全一致
 - 双版本：JPA 2（`javax.persistence`）与 JPA 3（`jakarta.persistence`），共享一份源码
@@ -148,6 +150,46 @@ List<User> list = userRepository.findAll(specification);
 UserCondition condition = objectMapper.readValue(json, UserCondition.class);
 Specification<User> spec = SpecificationHelper.DEFAULT.buildSpecification(condition);
 ```
+
+### 组合与排序（Spring 风格）
+
+`Specifications` 复刻 Spring Data 的 `Specification.where(...).and(...).or(...)`，
+但既接受条件 POJO，也接受手写 `Specification`。每个调用都不可变、空安全
+（`null` 操作数不产生约束；空条件匹配所有）：
+
+```java
+Specification<User> spec = Specifications.<User>where(userCondition)
+        .and(anotherCondition)
+        .or((root, q, cb) -> cb.equal(root.get("status"), 1))
+        .not()
+        .orderBy(Sort.by(Sort.Direction.DESC, "age"))
+        .build();
+```
+
+结果仍是普通 `Specification`，可直接交给 `JpaSpecificationExecutor`。
+
+排序也可以直接声明在条件上，用 `@OrderBy`，再通过 fluent builder 开启：
+
+```java
+public class UserCondition {
+    @Select(type = SelectTypeEnum.LIKE)
+    private String name;
+
+    @OrderBy(value = UserFields.dept.name, direction = OrderDirection.ASC, priority = 0)
+    private Boolean sortByDept;   // 值非空即启用该排序
+
+    @OrderBy(value = "age", direction = OrderDirection.DESC, priority = 1)
+    private Boolean sortByAge;
+}
+
+SpecificationHelper helper = SpecificationHelper.builder()
+        .distinct(true)   // 可选：前置 SetDistinctStage
+        .orderBy(true)    // 可选：应用 @OrderBy 字段
+        .build();
+```
+
+`@OrderBy` 字段非空才生效、支持点号 join 路径；多个排序字段按 `priority`（小者优先，同级按声明顺序）。
+绑定 `@EntityCondition` 后，`@Select` 与 `@OrderBy` 的路径都会被编译期校验。
 
 ## 类型安全的条件（实体绑定）
 
@@ -239,7 +281,7 @@ public class DeptUserNicknameCondition {
 
 ## 扩展性
 
-本库围绕两个扩展点设计，无需 fork 即可按需生长。
+本库围绕几个扩展点设计，无需 fork 即可按需生长。
 
 ### 1. 自定义操作符
 
@@ -262,7 +304,15 @@ public class MyResolver implements SelectPredicateResolver {
 }
 ```
 
-策略为无状态单例，按类缓存、线程安全。
+策略为无状态单例，按类缓存、线程安全。若 resolver 需要依赖或共享状态，可在
+`SelectPredicateResolverRegistry` 上注册具体实例并注入 helper：
+
+```java
+SelectPredicateResolverRegistry registry = new SelectPredicateResolverRegistry();
+registry.register(MyResolver.class, myResolverWithDependencies);
+
+SpecificationHelper helper = SpecificationHelper.builder().registry(registry).build();
+```
 
 ### 2. 自定义流水线阶段
 
@@ -287,12 +337,44 @@ public class MyStage implements SpecificationStage {
 }
 ```
 
-**核心阶段 `ConditionProcessor` 是受保护的。** 它负责把条件对象转成谓词，自定义管线不能悄悄跳过它：
+**条件处理是受保护的。** 把条件对象转成谓词这一步不能被悄悄跳过：
 
-- 构造函数在传入列表里没有 `ConditionProcessor` 时会**自动在末尾追加**一个——即使你忘了写，条件也一定会被处理。
+- 构造函数在传入列表里没有 `ConditionProcessorStage`（所有处理器都实现的标记接口，自定义处理器同样被保护）
+  时会**自动在末尾追加**一个 `ConditionProcessor`。
 - 想要严格校验可用 `SpecificationPipeline.requireConditionProcessor(stages)`：缺少该阶段会抛 `IllegalArgumentException`。
 
 `SetDistinctStage` 是刻意可选的——去掉它即可保留重复行（见上文 `distinct` 的说明）。
+
+### 3. 定制遍历过程（模板方法）
+
+`ConditionProcessor` 的算法继承自 `AbstractConditionProcessor`。想定制「条件如何转成谓词」
+又不想失去流水线保护，就继承基类、覆盖受保护的钩子：
+
+```java
+public class NameOnlyProcessor extends AbstractConditionProcessor {
+    @Override
+    protected boolean shouldProcessField(Field field, Object value) {
+        return field.getName().equals("name");
+    }
+}
+```
+
+可用钩子：`shouldProcessField`、`isMeaningful`、`combinePredicates`、`resolveJoinTarget`、
+`resolveResolver`、`resolveFieldName`。整体遍历（`process`）是 `final` 的——子类可调每一步，但不会破坏流水线契约。
+
+### 4. Fluent 构建 helper
+
+`SpecificationHelper.builder()` 用声明式开关 + 自定义阶段组装 helper，是手写
+`SpecificationPipeline` 的便捷替代：
+
+```java
+SpecificationHelper helper = SpecificationHelper.builder()
+        .distinct(true)                    // 前置 SetDistinctStage
+        .orderBy(true)                     // 追加 OrderByStage（@OrderBy 支持）
+        .stage(new MyStage())              // 自定义阶段在条件处理后运行
+        .registry(customRegistry)          // resolver 注册表
+        .build();
+```
 
 大多数场景内置流水线就够用——直接用共享单例 `SpecificationHelper.DEFAULT`。
 
@@ -301,7 +383,11 @@ public class MyStage implements SpecificationStage {
 | 扩展点 | 接口 / 入口 | 扩展什么 |
 | ------ | ----------- | -------- |
 | 谓词操作符 | `SelectPredicateResolver` + `@Select.resolver()` | 新的查询操作符 |
+| resolver 实例 | `SelectPredicateResolverRegistry` | resolver 的依赖注入 / 共享状态 |
 | 流水线阶段 | `SpecificationStage` + `SpecificationPipeline` | 新的构建步骤（去重、转换……） |
+| 条件遍历 | `AbstractConditionProcessor`（模板方法） | 条件对象如何变成谓词 |
+| helper 组装 | `SpecificationHelper.builder()` | 声明式流水线配置 |
+| 查询组合 | `Specifications` | 链式组合条件 / 规格、排序 |
 | 入口 | `SpecificationHelper`（或 `SpecificationHelper.DEFAULT`） | 查询如何被构建 |
 
 ## 分组示例

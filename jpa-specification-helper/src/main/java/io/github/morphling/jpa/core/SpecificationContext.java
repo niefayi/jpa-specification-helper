@@ -3,9 +3,12 @@ package io.github.morphling.jpa.core;
 import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.CriteriaQuery;
 import javax.persistence.criteria.Join;
+import javax.persistence.criteria.Order;
 import javax.persistence.criteria.Predicate;
 import javax.persistence.criteria.Root;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -28,6 +31,9 @@ public final class SpecificationContext {
 
     /** Join cache: ensures the same prefix path is joined only once per query. */
     private final Map<String, Join<?, ?>> joinCache = new HashMap<>();
+
+    /** Orderings collected by stages such as {@link OrderByStage}. */
+    private final List<Order> orders = new ArrayList<>();
 
     /** The final predicate produced by the pipeline. */
     private Predicate result;
@@ -60,6 +66,17 @@ public final class SpecificationContext {
      */
     public Map<String, Join<?, ?>> getJoinCache() {
         return joinCache;
+    }
+
+    /**
+     * Orderings collected so far, in application order.
+     */
+    public List<Order> getOrders() {
+        return orders;
+    }
+
+    public void addOrder(Order order) {
+        orders.add(order);
     }
 
     public Predicate getResult() {

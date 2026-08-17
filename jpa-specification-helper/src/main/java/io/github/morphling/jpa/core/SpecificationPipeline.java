@@ -15,15 +15,16 @@ import java.util.List;
  * <p>Use the constructor to assemble a custom list of stages, and pair it with
  * {@link io.github.morphling.jpa.SpecificationHelper} to build your own helper.</p>
  *
- * <p>{@link ConditionProcessor} is the core stage that turns the condition object
- * into predicates, so it is protected:</p>
+ * <p>Condition processing is protected:</p>
  *
  * <ul>
  *     <li>the {@linkplain #SpecificationPipeline(List) constructor} appends a
- *     {@link ConditionProcessor} at the end when the given list does not contain one,
- *     so a custom pipeline can never silently skip condition processing;</li>
+ *     {@link ConditionProcessor} at the end when the given list does not contain a
+ *     {@link ConditionProcessorStage} (any stage implementing the marker — including
+ *     custom {@link AbstractConditionProcessor} subclasses), so a custom pipeline can
+ *     never silently skip condition processing;</li>
  *     <li>{@link #requireConditionProcessor(List)} instead fails fast with an
- *     {@link IllegalArgumentException} when the stage is missing.</li>
+ *     {@link IllegalArgumentException} when such a stage is missing.</li>
  * </ul>
  *
  * <p>{@link SetDistinctStage} is optional on purpose — see the README note on
@@ -36,10 +37,11 @@ public final class SpecificationPipeline {
     private final List<SpecificationStage> stages;
 
     /**
-     * Creates a pipeline from the given stages. When no {@link ConditionProcessor}
-     * is present, one is appended at the end so the core condition processing
-     * always runs. If you need the processor at a specific position, or want a
-     * missing processor to fail fast, use {@link #requireConditionProcessor(List)}.
+     * Creates a pipeline from the given stages. When no {@link ConditionProcessorStage}
+     * is present, a {@link ConditionProcessor} is appended at the end so the core
+     * condition processing always runs. If you need the processor at a specific
+     * position, or want a missing processor to fail fast, use
+     * {@link #requireConditionProcessor(List)}.
      */
     public SpecificationPipeline(List<SpecificationStage> stages) {
         List<SpecificationStage> copy = new ArrayList<>(stages);
@@ -69,7 +71,7 @@ public final class SpecificationPipeline {
 
     private static boolean containsConditionProcessor(List<SpecificationStage> stages) {
         for (SpecificationStage stage : stages) {
-            if (stage instanceof ConditionProcessor) {
+            if (stage instanceof ConditionProcessorStage) {
                 return true;
             }
         }

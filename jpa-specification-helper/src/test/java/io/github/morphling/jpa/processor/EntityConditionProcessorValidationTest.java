@@ -261,4 +261,37 @@ class EntityConditionProcessorValidationTest {
         CompileTestUtil.Result r = CompileTestUtil.compile(sources);
         assertTrue(r.success, r.allDiagnostics());
     }
+
+    @Test
+    void orderByValid_shouldCompile() {
+        CompileTestUtil.Result r = compileCondition(
+                "    @OrderBy(value = \"age\", direction = OrderDirection.DESC) private Boolean sortAge;\n" +
+                "    @OrderBy(value = \"dept.name\", direction = OrderDirection.ASC, priority = 1) private Boolean sortDept;\n",
+                null);
+        assertTrue(r.success, r.allDiagnostics());
+    }
+
+    @Test
+    void orderByUnknownField_shouldFail() {
+        CompileTestUtil.Result r = compileCondition(
+                "    @OrderBy(value = \"nam\") private Boolean sortNam;\n", null);
+        assertFalse(r.success);
+        assertTrue(r.allDiagnostics().contains("not found"), r.allDiagnostics());
+    }
+
+    @Test
+    void orderByNonNavigableIntermediate_shouldFail() {
+        CompileTestUtil.Result r = compileCondition(
+                "    @OrderBy(value = \"name.age\") private Boolean sortNameAge;\n", null);
+        assertFalse(r.success);
+        assertTrue(r.allDiagnostics().contains("not a navigable association"), r.allDiagnostics());
+    }
+
+    @Test
+    void orderByToManyLeaf_shouldFail() {
+        CompileTestUtil.Result r = compileCondition(
+                "    @OrderBy(value = \"roles\") private Boolean sortRoles;\n", null);
+        assertFalse(r.success);
+        assertTrue(r.allDiagnostics().contains("to-many collection attribute"), r.allDiagnostics());
+    }
 }

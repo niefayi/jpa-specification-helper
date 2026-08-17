@@ -1,5 +1,6 @@
 package io.github.morphling.jpa;
 
+import io.github.morphling.jpa.builder.SpecificationHelperBuilder;
 import io.github.morphling.jpa.core.SpecificationContext;
 import io.github.morphling.jpa.core.SpecificationPipeline;
 import org.springframework.data.jpa.domain.Specification;
@@ -34,6 +35,16 @@ import java.util.Objects;
  * SpecificationHelper helper = new SpecificationHelper(pipeline);
  * </pre>
  *
+ * <p>Or use the fluent {@link #builder()}:</p>
+ *
+ * <pre>
+ * SpecificationHelper helper = SpecificationHelper.builder()
+ *         .distinct(true)
+ *         .orderBy(true)
+ *         .stage(new MyStage())
+ *         .build();
+ * </pre>
+ *
  * @author anyifei
  */
 public final class SpecificationHelper {
@@ -45,6 +56,13 @@ public final class SpecificationHelper {
 
     public SpecificationHelper(SpecificationPipeline pipeline) {
         this.pipeline = Objects.requireNonNull(pipeline, "pipeline");
+    }
+
+    /**
+     * Fluent builder for assembling a configured {@link SpecificationHelper}.
+     */
+    public static SpecificationHelperBuilder builder() {
+        return new SpecificationHelperBuilder();
     }
 
     public <T> Specification<T> buildSpecification(Object condition) {

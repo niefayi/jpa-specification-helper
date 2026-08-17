@@ -22,6 +22,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class SpecificationPipelineProtectionTest extends AbstractJpaTest {
 
+    /**
+     * A custom processor built on the template-method base; it must satisfy the
+     * {@link ConditionProcessorStage} marker so the pipeline protection still
+     * recognises it.
+     */
+    static final class CustomProcessor extends AbstractConditionProcessor {
+    }
+
     @BeforeEach
     void seed() {
         tx(em -> {
@@ -59,6 +67,32 @@ class SpecificationPipelineProtectionTest extends AbstractJpaTest {
     void requireConditionProcessor_present_shouldWork() {
         SpecificationPipeline pipeline = SpecificationPipeline.requireConditionProcessor(
                 Arrays.asList(new SetDistinctStage(), new ConditionProcessor()));
+        SpecificationHelper helper = new SpecificationHelper(pipeline);
+
+        UserCondition condition = new UserCondition();
+        condition.setName("Bob");
+        Specification<User> spec = helper.buildSpecification(condition);
+
+        assertEquals(new HashSet<>(Arrays.asList("Bob")), names(findAll(User.class, spec)));
+    }
+
+    @Test
+    void customProcessorStage_shouldSatisfyProtection() {
+        SpecificationPipeline pipeline = new SpecificationPipeline(
+                Collections.singletonList(new CustomProcessor()));
+        SpecificationHelper helper = new SpecificationHelper(pipeline);
+
+        UserCondition condition = new UserCondition();
+        condition.setName("Alice");
+        Specification<User> spec = helper.buildSpecification(condition);
+
+        assertEquals(new HashSet<>(Arrays.asList("Alice")), names(findAll(User.class, spec)));
+    }
+
+    @Test
+    void requireConditionProcessor_customStage_shouldNotThrow() {
+        SpecificationPipeline pipeline = SpecificationPipeline.requireConditionProcessor(
+                Collections.singletonList(new CustomProcessor()));
         SpecificationHelper helper = new SpecificationHelper(pipeline);
 
         UserCondition condition = new UserCondition();

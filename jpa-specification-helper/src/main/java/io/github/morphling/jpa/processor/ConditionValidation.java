@@ -2,6 +2,7 @@ package io.github.morphling.jpa.processor;
 
 import io.github.morphling.jpa.annotation.ConditionGroup;
 import io.github.morphling.jpa.annotation.EntityCondition;
+import io.github.morphling.jpa.annotation.OrderBy;
 import io.github.morphling.jpa.annotation.Select;
 import io.github.morphling.jpa.annotation.SelectTypeEnum;
 
@@ -70,6 +71,9 @@ final class ConditionValidation {
             if (member.getAnnotation(Select.class) != null) {
                 validateSelect(member, entity);
             }
+            if (member.getAnnotation(OrderBy.class) != null) {
+                validateOrderBy(member, entity);
+            }
             TypeMirror type = member.asType();
             if (type.getKind() == TypeKind.DECLARED) {
                 Element typeElement = ((DeclaredType) type).asElement();
@@ -106,55 +110,93 @@ final class ConditionValidation {
     private void validateSelect(Element field, TypeElement entity) {
         Select select = field.getAnnotation(Select.class);
         String path = select.value().isEmpty() ? field.getSimpleName().toString() : select.value();
-        List<String> segments = split(path);
-        if (segments.isEmpty()) {
-            error(field, "@Select on " + field.getSimpleName() + " has an empty path");
+        if (isEmptyPath(field, path, "@Select")) {
+            return;
+        }
+        ResolvedPath resolved = resolvePath(field, entity, path, "@Select");
+        if (resolved == null) {
             return;
         }
 
+        if (select.joinType().length > 1 && select.joinType().length != resolved.joinSegments) {
+            error(field, "@Select joinType length " + select.joinType().length
+                    + " does not match the number of join segments (" + resolved.joinSegments + ") in path \"" + path
+                    + "\"; use a single-element joinType to apply it uniformly");
+        }
+
+        if (!isCustomResolver(select)) {
+            checkOperatorType(field, select.type(), resolved.attrType, path);
+        }
+    }
+
+    private void validateOrderBy(Element field, TypeElement entity) {
+        OrderBy orderBy = field.getAnnotation(OrderBy.class);
+        String path = orderBy.value().isEmpty() ? field.getSimpleName().toString() : orderBy.value();
+        if (isEmptyPath(field, path, "@OrderBy")) {
+            return;
+        }
+        ResolvedPath resolved = resolvePath(field, entity, path, "@OrderBy");
+        if (resolved == null) {
+            return;
+        }
+        if (resolved.leafField != null && model.isCollection(resolved.leafField.asType())) {
+            error(field, "@OrderBy path \"" + path + "\" targets a to-many collection attribute \""
+                    + resolved.leafField.getSimpleName()
+                    + "\"; order by a scalar attribute or a to-one association path");
+        }
+    }
+
+    private boolean isEmptyPath(Element field, String path, String what) {
+        if (split(path).isEmpty()) {
+            error(field, what + " on " + field.getSimpleName() + " has an empty path");
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Walks a dotted path through the entity graph. For every intermediate segment
+     * the attribute must be a joinable association; the leaf may be any persistent
+     * attribute. Reports an error and returns {@code null} when the path is invalid.
+     */
+    private ResolvedPath resolvePath(Element field, TypeElement entity, String path, String what) {
+        List<String> segments = split(path);
         TypeElement current = entity;
         TypeMirror attrType = null;
+        Element leafField = null;
         int joinSegments = 0;
         for (int i = 0; i < segments.size(); i++) {
             String segment = segments.get(i);
             Element attr = model.findField(current, segment);
             if (attr == null) {
-                error(field, buildNotFound(field, current, segment, path));
-                return;
+                error(field, buildNotFound(field, current, segment, path, what));
+                return null;
             }
             if (i == segments.size() - 1) {
                 attrType = attr.asType();
+                leafField = attr;
             } else {
                 joinSegments++;
                 if (!model.isAssociation(attr)) {
                     if (model.isEmbedded(attr)) {
-                        error(field, "path \"" + path + "\" — \"" + segment
+                        error(field, what + " path \"" + path + "\" — \"" + segment
                                 + "\" is an @Embedded attribute; embedded paths are not supported, "
                                 + "use only joinable associations");
                     } else {
-                        error(field, "path \"" + path + "\" — \"" + segment
+                        error(field, what + " path \"" + path + "\" — \"" + segment
                                 + "\" is not a navigable association on " + current.getQualifiedName());
                     }
-                    return;
+                    return null;
                 }
                 TypeElement next = model.navigate(current, attr);
                 if (next == null) {
                     error(field, "cannot resolve target of \"" + segment + "\" on " + current.getQualifiedName());
-                    return;
+                    return null;
                 }
                 current = next;
             }
         }
-
-        if (select.joinType().length > 1 && select.joinType().length != joinSegments) {
-            error(field, "@Select joinType length " + select.joinType().length
-                    + " does not match the number of join segments (" + joinSegments + ") in path \"" + path
-                    + "\"; use a single-element joinType to apply it uniformly");
-        }
-
-        if (!isCustomResolver(select)) {
-            checkOperatorType(field, select.type(), attrType, path);
-        }
+        return new ResolvedPath(attrType, leafField, joinSegments);
     }
 
     private void checkOperatorType(Element field, SelectTypeEnum op, TypeMirror attrType, String path) {
@@ -327,9 +369,9 @@ final class ConditionValidation {
                         ((TypeElement) element).getQualifiedName().toString());
     }
 
-    private String buildNotFound(Element field, TypeElement owner, String segment, String path) {
+    private String buildNotFound(Element field, TypeElement owner, String segment, String path, String what) {
         String nearest = nearest(owner, segment);
-        return "@Select path \"" + path + "\" — field \"" + segment + "\" not found on entity "
+        return what + " path \"" + path + "\" — field \"" + segment + "\" not found on entity "
                 + owner.getQualifiedName()
                 + (nearest != null ? ", did you mean \"" + nearest + "\"?" : "");
     }
@@ -385,6 +427,21 @@ final class ConditionValidation {
 
     private static String display(TypeMirror t) {
         return t.toString();
+    }
+
+    /**
+     * Result of walking a dotted path through the entity graph.
+     */
+    private static final class ResolvedPath {
+        private final TypeMirror attrType;
+        private final Element leafField;
+        private final int joinSegments;
+
+        private ResolvedPath(TypeMirror attrType, Element leafField, int joinSegments) {
+            this.attrType = attrType;
+            this.leafField = leafField;
+            this.joinSegments = joinSegments;
+        }
     }
 
     private void error(Element element, String message) {
