@@ -8,6 +8,12 @@ Write a query once, reuse it everywhere. Define conditions declaratively on a pl
 POJO, and this library turns it into a type-safe
 `org.springframework.data.jpa.domain.Specification` for you.
 
+## Run it
+
+See [jpa-specification-helper-demo](https://github.com/niefayi/jpa-specification-helper-demo):
+a runnable Spring Boot reference app — a filter page whose JSON drives the query,
+with compile-time type-safe paths, join filtering and join-aware sorting.
+
 ## Why this library?
 
 ### 1. Writing a `Specification` by hand is painful

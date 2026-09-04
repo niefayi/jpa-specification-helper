@@ -7,6 +7,12 @@
 查询只写一次，到处复用。把查询条件声明式地定义在一个普通 POJO 上，由本库自动生成类型安全的
 `org.springframework.data.jpa.domain.Specification`。
 
+## 跑起来看看
+
+参考 [jpa-specification-helper-demo](https://github.com/niefayi/jpa-specification-helper-demo)：
+一个可运行的 Spring Boot 示例应用——筛选页面的 JSON 直接驱动查询，包含编译期类型安全路径、
+关联字段过滤与关联排序。
+
 ## 为什么需要这个库？
 
 ### 1. 手写 Specification 非常痛苦
