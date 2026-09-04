@@ -74,19 +74,21 @@ public final class Specifications<T> implements Specification<T> {
     }
 
     public Specifications<T> and(Object condition) {
-        return new Specifications<>(helper, delegate.and(toSpec(condition, helper)));
+        Specification<T> spec = toSpec(condition, helper);
+        return new Specifications<>(helper, spec == null ? delegate : delegate.and(spec));
     }
 
     public Specifications<T> and(Specification<T> other) {
-        return new Specifications<>(helper, delegate.and(other));
+        return new Specifications<>(helper, other == null ? delegate : delegate.and(other));
     }
 
     public Specifications<T> or(Object condition) {
-        return new Specifications<>(helper, delegate.or(toSpec(condition, helper)));
+        Specification<T> spec = toSpec(condition, helper);
+        return new Specifications<>(helper, spec == null ? delegate : delegate.or(spec));
     }
 
     public Specifications<T> or(Specification<T> other) {
-        return new Specifications<>(helper, delegate.or(other));
+        return new Specifications<>(helper, other == null ? delegate : delegate.or(other));
     }
 
     public Specifications<T> not() {

@@ -23,7 +23,7 @@ import java.util.Date;
 public class AroundMonthResolver implements SelectPredicateResolver {
 
     @Override
-    public Predicate getPredicate(From<?, ?> from, CriteriaBuilder cb, String fieldName, Object fieldObject) {
+    public Predicate  getPredicate(From<?, ?> from, CriteriaBuilder cb, String fieldName, Object fieldObject) {
         Date date = (Date) fieldObject;
         return cb.between(from.get(fieldName), startOfMonth(date), endOfMonth(date));
     }
