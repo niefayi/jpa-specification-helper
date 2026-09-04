@@ -98,7 +98,7 @@ public class UserCondition {
 
 ```xml
 <dependency>
-    <groupId>io.github.anyifei12138</groupId>
+    <groupId>io.github.niefayi</groupId>
     <artifactId>jpa-specification-helper</artifactId>
     <version>1.3.0</version>
 </dependency>
@@ -108,7 +108,7 @@ public class UserCondition {
 
 ```xml
 <dependency>
-    <groupId>io.github.anyifei12138</groupId>
+    <groupId>io.github.niefayi</groupId>
     <artifactId>jpa-specification-helper-jakarta</artifactId>
     <version>1.3.0</version>
 </dependency>

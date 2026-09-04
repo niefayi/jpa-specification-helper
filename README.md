@@ -108,7 +108,7 @@ Pick the variant that matches your JPA / Spring Boot version:
 
 ```xml
 <dependency>
-    <groupId>io.github.anyifei12138</groupId>
+    <groupId>io.github.niefayi</groupId>
     <artifactId>jpa-specification-helper</artifactId>
     <version>1.3.0</version>
 </dependency>
@@ -118,7 +118,7 @@ Pick the variant that matches your JPA / Spring Boot version:
 
 ```xml
 <dependency>
-    <groupId>io.github.anyifei12138</groupId>
+    <groupId>io.github.niefayi</groupId>
     <artifactId>jpa-specification-helper-jakarta</artifactId>
     <version>1.3.0</version>
 </dependency>

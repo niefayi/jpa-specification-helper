@@ -4,14 +4,14 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>io.github.anyifei12138</groupId>
+    <groupId>io.github.niefayi</groupId>
     <artifactId>jpa-specification-helper-parent</artifactId>
     <version>${revision}</version>
     <packaging>pom</packaging>
 
     <name>jpa-specification-helper</name>
     <description>Annotation-driven JPA Specification helper. Write a query once, reuse it everywhere.</description>
-    <url>https://github.com/anyifei12138/jpa-specification-helper</url>
+    <url>https://github.com/niefayi/jpa-specification-helper</url>
 
     <licenses>
         <license>
@@ -24,15 +24,15 @@
     <developers>
         <developer>
             <name>anyifei</name>
-            <email>anyifei12138@users.noreply.github.com</email>
-            <url>https://github.com/anyifei12138</url>
+            <email>niefayi@users.noreply.github.com</email>
+            <url>https://github.com/niefayi</url>
         </developer>
     </developers>
 
     <scm>
-        <connection>scm:git:git://github.com/anyifei12138/jpa-specification-helper.git</connection>
-        <developerConnection>scm:git:ssh://git@github.com/anyifei12138/jpa-specification-helper.git</developerConnection>
-        <url>https://github.com/anyifei12138/jpa-specification-helper</url>
+        <connection>scm:git:git://github.com/niefayi/jpa-specification-helper.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/niefayi/jpa-specification-helper.git</developerConnection>
+        <url>https://github.com/niefayi/jpa-specification-helper</url>
     </scm>
 
     <modules>
