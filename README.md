@@ -110,7 +110,7 @@ Pick the variant that matches your JPA / Spring Boot version:
 <dependency>
     <groupId>io.github.niefayi</groupId>
     <artifactId>jpa-specification-helper</artifactId>
-    <version>1.3.0</version>
+    <version>1.3.1</version>
 </dependency>
 ```
 
@@ -120,7 +120,7 @@ Pick the variant that matches your JPA / Spring Boot version:
 <dependency>
     <groupId>io.github.niefayi</groupId>
     <artifactId>jpa-specification-helper-jakarta</artifactId>
-    <version>1.3.0</version>
+    <version>1.3.1</version>
 </dependency>
 ```
 
